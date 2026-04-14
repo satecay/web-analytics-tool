@@ -1,110 +1,119 @@
 import streamlit as st
-import requests
-from bs4 import BeautifulSoup
-from pytrends.request import TrendReq
-import xml.etree.ElementTree as ET
 import plotly.express as px
+import pandas as pd
+import random
 
-pytrends = TrendReq()
+st.set_page_config(layout="wide")
 
-# ================= UI CONFIG =================
-st.set_page_config(page_title="Mini SimilarWeb", layout="wide")
-
-# Dark style
+# ===== STYLE =====
 st.markdown("""
 <style>
-body { background-color: #0f172a; color: white; }
-.card {
-    background: #1e293b;
-    padding: 20px;
-    border-radius: 12px;
+body {background-color: #0b1220;}
+.block {
+    background: linear-gradient(145deg,#111827,#1f2937);
+    padding:20px;
+    border-radius:15px;
+    box-shadow:0 4px 20px rgba(0,0,0,0.3);
 }
 .metric {
-    font-size: 28px;
-    font-weight: bold;
+    font-size:28px;
+    font-weight:bold;
 }
+.small {color:#9ca3af;font-size:14px;}
 </style>
 """, unsafe_allow_html=True)
 
-st.title("📊 Mini SimilarWeb")
+# ===== HEADER =====
+st.title("📊 Phân tích traffic website")
+domain = st.text_input("", placeholder="Nhập domain...")
 
-domain = st.text_input("Nhập domain", placeholder="vd: vnexpress.net")
-
-# ================= LOGIC =================
-def get_trend(domain):
-    keyword = domain.split('.')[0]
-    try:
-        pytrends.build_payload([keyword], timeframe='today 3-m')
-        df = pytrends.interest_over_time()
-        return int(df[keyword].mean()) if not df.empty else 10
-    except:
-        return 10
-
-def get_pages(domain):
-    try:
-        res = requests.get(f"https://{domain}/sitemap.xml", timeout=5)
-        root = ET.fromstring(res.content)
-        return len(root.findall(".//{*}loc"))
-    except:
-        return 50
-
-def analyze(domain):
-    res = requests.get(f"https://{domain}", headers={"User-Agent":"Mozilla/5.0"}, timeout=5)
-    soup = BeautifulSoup(res.text, "html.parser")
-
-    trend = get_trend(domain)
-    pages = get_pages(domain)
-
-    seo = 0
-    if soup.title: seo += 20
-    if soup.find("meta", attrs={"name":"description"}): seo += 20
-    if soup.find_all("h1"): seo += 20
-
-    traffic = int(trend * 1000 * (1 + pages/500) * (1 + seo/100))
-
-    mobile = 70 if soup.find("meta", attrs={"name":"viewport"}) else 40
-    desktop = 100 - mobile
-
-    sources = {
-        "Search": min(70, 30 + seo // 2),
-        "Direct": 20,
-        "Social": 10,
-        "Referral": 100 - (30 + seo // 2 + 20 + 10)
+# ===== FAKE DATA (demo UI trước) =====
+def generate_data():
+    return {
+        "traffic": "48.5M",
+        "time": "4m 45s",
+        "bounce": "38%",
+        "pages": "5.8",
+        "mobile": 63,
+        "desktop": 32,
+        "tablet": 5
     }
 
-    return traffic, mobile, desktop, sources
+# ===== MAIN =====
+if st.button("Phân tích"):
+    data = generate_data()
 
+    # ===== KPI =====
+    col1, col2, col3, col4 = st.columns(4)
 
-# ================= MAIN =================
-if st.button("Analyze"):
-    if domain:
-        with st.spinner("Đang phân tích..."):
-            traffic, mobile, desktop, sources = analyze(domain)
+    col1.markdown(f'<div class="block"><div class="small">LƯỢT TRUY CẬP</div><div class="metric">{data["traffic"]}</div></div>', unsafe_allow_html=True)
+    col2.markdown(f'<div class="block"><div class="small">THỜI GIAN TB</div><div class="metric">{data["time"]}</div></div>', unsafe_allow_html=True)
+    col3.markdown(f'<div class="block"><div class="small">BOUNCE RATE</div><div class="metric">{data["bounce"]}</div></div>', unsafe_allow_html=True)
+    col4.markdown(f'<div class="block"><div class="small">PAGES / VISIT</div><div class="metric">{data["pages"]}</div></div>', unsafe_allow_html=True)
 
-        # KPI
-        col1, col2, col3 = st.columns(3)
+    st.markdown("---")
 
-        col1.metric("🚀 Visits / Month", f"{traffic:,}")
-        col2.metric("📱 Mobile %", f"{mobile}%")
-        col3.metric("💻 Desktop %", f"{desktop}%")
+    # ===== LINE CHART =====
+    st.subheader("📈 Lưu lượng theo tháng")
+    months = list(range(1,13))
+    traffic = [random.randint(20,100) for _ in months]
 
-        st.divider()
+    df = pd.DataFrame({"Month": months, "Traffic": traffic})
+    fig = px.line(df, x="Month", y="Traffic")
+    fig.update_layout(template="plotly_dark")
 
-        col4, col5 = st.columns(2)
+    st.plotly_chart(fig, use_container_width=True)
 
-        # Device Chart
-        device_df = {"Device": ["Mobile", "Desktop"], "Value": [mobile, desktop]}
-        fig1 = px.pie(device_df, names="Device", values="Value", hole=0.5)
-        fig1.update_layout(template="plotly_dark")
+    # ===== ROW 2 =====
+    col5, col6 = st.columns(2)
 
-        col4.plotly_chart(fig1, use_container_width=True)
+    # DEVICE
+    device_df = pd.DataFrame({
+        "Device": ["Desktop","Mobile","Tablet"],
+        "Value": [data["desktop"], data["mobile"], data["tablet"]]
+    })
 
-        # Traffic Sources
-        source_df = {"Source": list(sources.keys()), "Value": list(sources.values())}
-        fig2 = px.bar(source_df, x="Source", y="Value")
-        fig2.update_layout(template="plotly_dark")
+    fig2 = px.pie(device_df, names="Device", values="Value", hole=0.6)
+    fig2.update_layout(template="plotly_dark")
 
-        col5.plotly_chart(fig2, use_container_width=True)
+    col5.subheader("💻 Thiết bị truy cập")
+    col5.plotly_chart(fig2, use_container_width=True)
 
-    else:
-        st.warning("Nhập domain trước 😄")
+    # SOURCES
+    sources = {
+        "Direct":42,
+        "Search":33,
+        "Social":14,
+        "Referral":6,
+        "Email":3,
+        "Display":2
+    }
+
+    col6.subheader("🔗 Nguồn truy cập")
+    for k,v in sources.items():
+        col6.progress(v/100)
+        col6.write(f"{k}: {v}%")
+
+    # ===== ROW 3 =====
+    col7, col8 = st.columns(2)
+
+    # TOP COUNTRY
+    country_df = pd.DataFrame({
+        "Country":["Vietnam","USA","Australia","France","Japan"],
+        "Value":[88,4,2,1.5,1.2]
+    })
+
+    col7.subheader("🌍 Top quốc gia")
+    fig3 = px.bar(country_df, x="Value", y="Country", orientation='h')
+    fig3.update_layout(template="plotly_dark")
+    col7.plotly_chart(fig3, use_container_width=True)
+
+    # KEYWORDS
+    keyword_df = pd.DataFrame({
+        "Keyword":["vnexpress","tin tức","bóng đá","thời sự","covid việt nam"],
+        "Volume":["9.2M","3.4M","2.1M","1.5M","980K"],
+        "Share":["18%","7%","4.3%","3.1%","2%"]
+    })
+
+    col8.subheader("🔎 Top Keywords")
+    col8.dataframe(keyword_df)
