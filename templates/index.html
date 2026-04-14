@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mini SimilarWeb</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: Arial; background:#f5f6fa; padding:20px; }
+        .card { background:white; padding:20px; margin:10px 0; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,0.1);}
+        .grid { display:grid; grid-template-columns: 1fr 1fr; gap:20px;}
+    </style>
+</head>
+<body>
+
+<h2>📊 Mini SimilarWeb</h2>
+
+<form method="POST">
+    <input type="text" name="domain" placeholder="example.com" required>
+    <button type="submit">Analyze</button>
+</form>
+
+{% if data and not data.error %}
+
+<div class="card">
+    <h3>{{ data.domain }}</h3>
+    <p>{{ data.title }}</p>
+    <h2>🚀 {{ data.traffic }} visits / month</h2>
+</div>
+
+<div class="grid">
+
+<div class="card">
+    <h4>📱 Device</h4>
+    <canvas id="deviceChart"></canvas>
+</div>
+
+<div class="card">
+    <h4>🔍 Traffic Sources</h4>
+    <canvas id="sourceChart"></canvas>
+</div>
+
+</div>
+
+<script>
+const deviceChart = new Chart(document.getElementById('deviceChart'), {
+    type: 'doughnut',
+    data: {
+        labels: ['Mobile', 'Desktop'],
+        datasets: [{
+            data: [{{ data.mobile }}, {{ data.desktop }}]
+        }]
+    }
+});
+
+const sourceChart = new Chart(document.getElementById('sourceChart'), {
+    type: 'pie',
+    data: {
+        labels: {{ data.sources.keys()|list }},
+        datasets: [{
+            data: {{ data.sources.values()|list }}
+        }]
+    }
+});
+</script>
+
+{% endif %}
+
+</body>
+</html>
